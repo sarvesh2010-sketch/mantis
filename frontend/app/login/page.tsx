@@ -1,20 +1,21 @@
 'use client'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Mail, Lock, Bug, Eye, EyeOff, ArrowRight } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/authStore'
 import { toast } from 'sonner'
 
-export default function LoginPage() {
+function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading] = useState(false)
   const { setAuth } = useAuthStore()
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -27,7 +28,14 @@ export default function LoginPage() {
         res.data.company
       )
       toast.success('Welcome back!')
-      router.push(res.data.role === 'company' ? '/dashboard' : '/products')
+      
+      // Redirect to target URL if present, otherwise role default
+      const redirect = searchParams.get('redirect')
+      if (redirect) {
+        router.push(redirect)
+      } else {
+        router.push(res.data.role === 'company' ? '/dashboard' : '/products')
+      }
     } catch {
       toast.error('Invalid credentials')
     } finally {
@@ -120,5 +128,17 @@ export default function LoginPage() {
         </div>
       </motion.div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   )
 }

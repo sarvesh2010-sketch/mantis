@@ -1,17 +1,20 @@
 'use client'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { useState, useEffect, useRef } from 'react'
-import { Send, Mic, MicOff, Camera, Image as ImageIcon, X, Volume2, VolumeX, Bug, ChevronLeft, CheckCircle, Loader2, Sparkles, Zap } from 'lucide-react'
+import { Send, Mic, MicOff, Camera, X, Volume2, VolumeX, Bug, ChevronLeft, CheckCircle, Loader2, Zap, Plus } from 'lucide-react'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
 import { useChatStore } from '@/stores/chatStore'
 import { api } from '@/lib/api'
-import type { Product, SourceCitation } from '@/types'
+import type { Product, SourceCitation, Message } from '@/types'
 import { CATEGORIES } from '@/types'
 import { getCategoryColor } from '@/lib/utils'
 import { useVoiceInput } from '@/hooks/useVoiceInput'
 import { useTextToSpeech } from '@/hooks/useTextToSpeech'
+import { useAuthStore } from '@/stores/authStore'
+import { UploadManualModal } from '@/components/UploadManualModal'
+
 
 const DIAGNOSTIC_STEPS = [
   { step: 1, label: 'Intake', desc: 'Understanding symptoms' },
@@ -111,7 +114,7 @@ function SourcePills({ sources }: { sources: SourceCitation[] }) {
 /* ============================================
    MESSAGE BUBBLE
    ============================================ */
-function MessageBubble({ msg }: { msg: any }) {
+function MessageBubble({ msg }: { msg: Message }) {
   const isUser = msg.role === 'user'
 
   return (
@@ -199,32 +202,80 @@ function TypingIndicator() {
    ============================================ */
 export default function AssistantPage() {
   const params = useParams()
+  const router = useRouter()
   const productId = params.id as string
   const [product, setProduct] = useState<Product | null>(null)
   const [input, setInput] = useState('')
   const [autoSpeak, setAutoSpeak] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [isUploadOpen, setIsUploadOpen] = useState(false)
   const chatEndRef = useRef<HTMLDivElement>(null)
+
+  const handleUploadSuccess = (newDoc: any) => {
+    setProduct(prev => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        knowledge_documents: [
+          ...(prev.knowledge_documents || []),
+          {
+            ...newDoc,
+            indexed: false,
+            created_at: new Date().toISOString()
+          }
+        ]
+      }
+    })
+  }
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [isVoiceInput, setIsVoiceInput] = useState(false)
   const { startRecording, stopRecording } = useVoiceInput()
   const { speak } = useTextToSpeech()
+  const { isAuthenticated } = useAuthStore()
 
   const {
     messages, session, isLoading, isRecording, diagnosticStep,
-    pendingImageUrl, initSession, addMessage, setLoading, setRecording,
+    pendingImageUrl, initSession, addMessage, setLoading,
     setDiagnosticStep, setPendingImage, clearSession
   } = useChatStore()
 
+  // Fetch product data
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.push(`/login?redirect=/products/${productId}/assistant`)
+      return
+    }
+
+    async function fetchProduct() {
+      try {
+        const res = await api.get(`/products/${productId}`)
+        setProduct(res.data)
+      } catch {
+        setProduct({
+          id: productId, company_id: 'c1', name: 'Honda Activa 6G', model_number: 'Activa 6G',
+          category: 'scooter', description: "Honda's best-selling automatic scooter",
+          is_published: true, created_at: new Date().toISOString(),
+          companies: { name: 'Honda Motors' },
+          knowledge_documents: [
+            { id: 'd1', product_id: productId, title: 'Owner Manual', type: 'pdf', indexed: true, created_at: '', page_count: 128, chunk_count: 215 },
+          ],
+        })
+      }
+    }
+    const timer = setTimeout(() => {
+      fetchProduct()
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [productId])
+
   // Init session + initial greeting
   useEffect(() => {
-    fetchProduct()
     if (!session || session.product_id !== productId) {
       initSession(productId)
       // Auto-send greeting
-      setTimeout(() => {
+      const greetingTimer = setTimeout(() => {
         addMessage({
           role: 'assistant',
           content: `Hello! I'm ready to help you diagnose issues with your product. 🔧\n\nWhat problem are you experiencing today? Describe any symptoms — sounds, behaviors, error lights, or anything unusual you've noticed.`,
@@ -233,30 +284,14 @@ export default function AssistantPage() {
           retrieval_ms: 0,
         })
       }, 500)
+      return () => clearTimeout(greetingTimer)
     }
-  }, [productId])
+  }, [productId, session, initSession, addMessage])
 
   // Scroll to bottom on new message
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isLoading])
-
-  async function fetchProduct() {
-    try {
-      const res = await api.get(`/products/${productId}`)
-      setProduct(res.data)
-    } catch {
-      setProduct({
-        id: productId, company_id: 'c1', name: 'Honda Activa 6G', model_number: 'Activa 6G',
-        category: 'scooter', description: "Honda's best-selling automatic scooter",
-        is_published: true, created_at: new Date().toISOString(),
-        companies: { name: 'Honda Motors' },
-        knowledge_documents: [
-          { id: 'd1', product_id: productId, title: 'Owner Manual', type: 'pdf', indexed: true, created_at: '', page_count: 128, chunk_count: 215 },
-        ],
-      })
-    }
-  }
 
   const handleVoiceToggle = async () => {
     if (isRecording) {
@@ -377,7 +412,15 @@ export default function AssistantPage() {
               <div className="divider my-5" />
 
               {/* Knowledge base mini */}
-              <span className="label mb-3">Knowledge Base</span>
+              <div className="flex items-center justify-between mb-3">
+                <span className="label">Knowledge Base</span>
+                <button
+                  onClick={() => setIsUploadOpen(true)}
+                  className="text-2xs text-brand-400 hover:text-white transition-colors flex items-center gap-1 font-medium"
+                >
+                  <Plus className="w-3 h-3 text-brand-400" /> Upload
+                </button>
+              </div>
               <div className="space-y-2 flex-1 overflow-y-auto">
                 {product?.knowledge_documents?.map((doc) => (
                   <div key={doc.id} className="flex items-center gap-2 text-xs text-text-muted">
@@ -548,6 +591,15 @@ export default function AssistantPage() {
           </div>
         </div>
       </div>
+      {product && (
+        <UploadManualModal
+          isOpen={isUploadOpen}
+          onClose={() => setIsUploadOpen(false)}
+          productId={productId}
+          productName={product.name}
+          onSuccess={handleUploadSuccess}
+        />
+      )}
     </div>
   )
 }

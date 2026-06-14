@@ -1,0 +1,6 @@
+# Pyrefly type checker configuration
+# Points to the backend virtual environment so Pyrefly can find installed packages
+python-interpreter-path = "backend/venv/Scripts/python.exe"
+
+# Add backend directory to the search path so relative imports work
+search-path = ["backend"]

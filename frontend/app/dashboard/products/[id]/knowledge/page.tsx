@@ -1,7 +1,7 @@
 'use client'
 import { motion } from 'framer-motion'
 import { useParams } from 'next/navigation'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { Upload, FileText, Link as LinkIcon, Trash2, CheckCircle, Loader2, ExternalLink, Plus } from 'lucide-react'
 import { api } from '@/lib/api'
@@ -20,9 +20,7 @@ export default function KnowledgeBasePage() {
   const params = useParams()
   const productId = params.id as string
   const [activeTab, setActiveTab] = useState<'upload' | 'links'>('upload')
-  const [documents, setDocuments] = useState<Doc[]>([
-    { id: '1', title: 'Owner Manual (2024)', type: 'pdf', page_count: 128, chunk_count: 215, indexed: true },
-  ])
+  const [documents, setDocuments] = useState<Doc[]>([])
   const [uploading, setUploading] = useState(false)
   const [uploadTitle, setUploadTitle] = useState('')
   const [linkTitle, setLinkTitle] = useState('')
@@ -79,6 +77,29 @@ export default function KnowledgeBasePage() {
       setLinkUrl('')
     } catch {
       toast.error('Failed to add link')
+    }
+  }
+
+  useEffect(() => {
+    async function fetchProduct() {
+      try {
+        const res = await api.get(`/products/${productId}`)
+        setDocuments(res.data.knowledge_documents || [])
+      } catch (err) {
+        console.error("Failed to fetch product documents:", err)
+      }
+    }
+    fetchProduct()
+  }, [productId])
+
+  async function handleDelete(docId: string) {
+    if (!confirm('Are you sure you want to delete this document?')) return
+    try {
+      await api.delete(`/knowledge/${docId}`)
+      setDocuments(prev => prev.filter(d => d.id !== docId))
+      toast.success('Document deleted successfully')
+    } catch {
+      toast.error('Failed to delete document')
     }
   }
 
@@ -210,7 +231,10 @@ export default function KnowledgeBasePage() {
                     <Loader2 className="w-3 h-3 animate-spin" /> Indexing
                   </span>
                 )}
-                <button className="btn-ghost p-1.5 text-text-muted hover:text-red-400">
+                <button
+                  onClick={() => handleDelete(doc.id)}
+                  className="btn-ghost p-1.5 text-text-muted hover:text-red-400"
+                >
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>

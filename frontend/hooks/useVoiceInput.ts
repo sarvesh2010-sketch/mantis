@@ -1,5 +1,5 @@
 'use client'
-import { useState, useRef, useCallback } from 'react'
+import { useRef, useCallback } from 'react'
 import { api } from '@/lib/api'
 import { useChatStore } from '@/stores/chatStore'
 import { toast } from 'sonner'
@@ -22,7 +22,7 @@ export function useVoiceInput() {
 
       mediaRecorder.start(100)
       setRecording(true)
-    } catch (err) {
+    } catch {
       toast.error('Microphone access denied')
     }
   }, [setRecording])

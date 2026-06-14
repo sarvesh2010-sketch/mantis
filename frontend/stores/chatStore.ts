@@ -22,7 +22,7 @@ interface ChatState {
   clearSession: () => void
 }
 
-export const useChatStore = create<ChatState>()((set, get) => ({
+export const useChatStore = create<ChatState>()((set) => ({
   messages: [],
   session: null,
   isLoading: false,

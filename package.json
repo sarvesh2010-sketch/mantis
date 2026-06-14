@@ -1,0 +1,8 @@
+{
+  "name": "mantis-workspace",
+  "version": "1.0.0",
+  "description": "Root workspace for Mantis App",
+  "scripts": {
+    "dev": "node run-dev.js"
+  }
+}

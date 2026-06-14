@@ -1,8 +1,8 @@
 from typing import List, Dict, Optional
-from openai import AsyncOpenAI
+from groq import AsyncGroq
 from config import settings
 
-client = AsyncOpenAI(api_key=settings.openai_api_key)
+client = AsyncGroq(api_key=settings.groq_api_key)
 
 DIAGNOSTIC_SYSTEM_PROMPT = """You are Mantis, an expert product diagnostic assistant — like a senior field technician with 20 years of experience troubleshooting consumer and industrial products.
 
@@ -84,7 +84,7 @@ async def get_diagnostic_reply(
     diagnostic_step: int,
     image_url: Optional[str] = None,
 ) -> str:
-    """Call GPT-4o with full diagnostic system prompt and retrieved context."""
+    """Call Groq (Llama 3) with full diagnostic system prompt and retrieved context."""
 
     context_str = build_context_string(moss_results)
 
@@ -99,28 +99,19 @@ async def get_diagnostic_reply(
     for msg in conversation_history[-10:]:
         messages.append({"role": msg["role"], "content": msg["content"]})
 
-    # Build current user message (with optional image)
+    # Build current user message (with optional image description)
     if image_url:
-        user_content = [
-            {
-                "type": "image_url",
-                "image_url": {"url": image_url, "detail": "high"}
-            },
-            {
-                "type": "text",
-                "text": user_message if user_message else "I've uploaded an image of the issue. What do you see and what does it indicate?"
-            }
-        ]
+        user_content = f"{user_message}\n\n[User has uploaded an image: {image_url}]" if user_message else f"I've uploaded an image of the issue. What do you see and what does it indicate?\n\n[Image: {image_url}]"
     else:
         user_content = user_message
 
     messages.append({"role": "user", "content": user_content})
 
     response = await client.chat.completions.create(
-        model="gpt-4o",
+        model="llama-3.3-70b-versatile",
         messages=messages,
         max_tokens=800,
-        temperature=0.3,   # Low temp for consistent, factual diagnostic replies
+        temperature=0.3,
     )
 
     return response.choices[0].message.content

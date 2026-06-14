@@ -1,14 +1,17 @@
 'use client'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
-import { Building2, FileText, ExternalLink, Download, Mic, Camera, MessageSquare, Zap, ChevronRight, Play } from 'lucide-react'
+import { Building2, FileText, ExternalLink, Download, Mic, Camera, MessageSquare, ChevronRight, Play, Plus } from 'lucide-react'
 import { CATEGORIES } from '@/types'
 import type { Product } from '@/types'
 import { api } from '@/lib/api'
 import { getCategoryColor } from '@/lib/utils'
 import { Footer } from '@/components/layout/Footer'
+import { useAuthStore } from '@/stores/authStore'
+import { UploadManualModal } from '@/components/UploadManualModal'
+
 
 const DIAGNOSTIC_STEPS = [
   { step: 1, label: 'Intake', desc: 'Understanding symptoms' },
@@ -21,35 +24,63 @@ const DIAGNOSTIC_STEPS = [
 
 export default function ProductDetailPage() {
   const params = useParams()
+  const router = useRouter()
   const productId = params.id as string
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isUploadOpen, setIsUploadOpen] = useState(false)
+  const { isAuthenticated } = useAuthStore()
+
+  const handleUploadSuccess = (newDoc: any) => {
+    setProduct(prev => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        knowledge_documents: [
+          ...(prev.knowledge_documents || []),
+          {
+            ...newDoc,
+            indexed: false,
+            created_at: new Date().toISOString()
+          }
+        ]
+      }
+    })
+  }
 
   useEffect(() => {
-    fetchProduct()
-  }, [productId])
-
-  async function fetchProduct() {
-    try {
-      const res = await api.get(`/products/${productId}`)
-      setProduct(res.data)
-    } catch {
-      // Demo fallback
-      setProduct({
-        id: productId, company_id: 'c1', name: 'Honda Activa 6G', model_number: 'Activa 6G',
-        category: 'scooter', description: "Honda's best-selling automatic scooter, powered by a 109.51cc BS6 compliant engine. Features include silent start, LED headlamp, integrated headlamp beam with position lamp, and telescopic front suspension. The engine delivers smooth performance with enhanced mileage and lower emissions.",
-        is_published: true, created_at: new Date().toISOString(),
-        companies: { name: 'Honda Motors', description: 'Leading motorcycle and scooter manufacturer' },
-        knowledge_documents: [
-          { id: 'd1', product_id: productId, title: 'Owner Manual (2024)', type: 'pdf', page_count: 128, chunk_count: 215, indexed: true, created_at: '' },
-          { id: 'd2', product_id: productId, title: 'Service Guide', type: 'pdf', page_count: 64, chunk_count: 108, indexed: true, created_at: '' },
-          { id: 'd3', product_id: productId, title: 'Honda Support FAQ', type: 'link', external_url: 'https://honda.co.in/support', indexed: false, created_at: '' },
-        ],
-      })
-    } finally {
-      setLoading(false)
+    if (!isAuthenticated) {
+      router.push(`/login?redirect=/products/${productId}`)
+      return
     }
-  }
+
+    async function fetchProduct() {
+      try {
+        const res = await api.get(`/products/${productId}`)
+        setProduct(res.data)
+      } catch {
+        // Demo fallback
+        setProduct({
+          id: productId, company_id: 'c1', name: 'Honda Activa 6G', model_number: 'Activa 6G',
+          category: 'scooter', description: "Honda's best-selling automatic scooter, powered by a 109.51cc BS6 compliant engine. Features include silent start, LED headlamp, integrated headlamp beam with position lamp, and telescopic front suspension. The engine delivers smooth performance with enhanced mileage and lower emissions.",
+          is_published: true, created_at: new Date().toISOString(),
+          companies: { name: 'Honda Motors', description: 'Leading motorcycle and scooter manufacturer' },
+          knowledge_documents: [
+            { id: 'd1', product_id: productId, title: 'Owner Manual (2024)', type: 'pdf', page_count: 128, chunk_count: 215, indexed: true, created_at: '' },
+            { id: 'd2', product_id: productId, title: 'Service Guide', type: 'pdf', page_count: 64, chunk_count: 108, indexed: true, created_at: '' },
+            { id: 'd3', product_id: productId, title: 'Honda Support FAQ', type: 'link', external_url: 'https://honda.co.in/support', indexed: false, created_at: '' },
+          ],
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    const timer = setTimeout(() => {
+      fetchProduct()
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [productId])
 
   if (loading) {
     return (
@@ -120,7 +151,15 @@ export default function ProductDetailPage() {
 
               {/* Knowledge Base */}
               <div className="mt-10">
-                <h2 className="text-xl font-semibold text-white mb-5">Available Documentation</h2>
+                <div className="flex items-center justify-between mb-5">
+                  <h2 className="text-xl font-semibold text-white">Available Documentation</h2>
+                  <button
+                    onClick={() => setIsUploadOpen(true)}
+                    className="btn-secondary py-2 px-3 text-xs flex items-center gap-1.5 font-medium"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-brand-400" /> Upload Manual
+                  </button>
+                </div>
                 <div className="space-y-3">
                   {product.knowledge_documents?.map((doc) => (
                     <motion.div
@@ -241,6 +280,14 @@ export default function ProductDetailPage() {
         </div>
       </div>
       <Footer />
+
+      <UploadManualModal
+        isOpen={isUploadOpen}
+        onClose={() => setIsUploadOpen(false)}
+        productId={productId}
+        productName={product.name}
+        onSuccess={handleUploadSuccess}
+      />
     </>
   )
 }

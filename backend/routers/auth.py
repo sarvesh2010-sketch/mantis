@@ -6,11 +6,22 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/register")
 async def register(body: RegisterRequest):
-    # 1. Create Supabase auth user
+    # 1. Create Supabase auth user via Admin client to bypass rate limits and email confirmation
     try:
-        res = supabase.auth.sign_up({"email": body.email, "password": body.password})
+        print("DEBUG REGISTRATION (flushed):", flush=True)
+        print("supabase _headers:", supabase.auth._headers, flush=True)
+        
+        res = supabase.auth.admin.create_user({
+            "email": body.email,
+            "password": body.password,
+            "email_confirm": True
+        })
         user_id = res.user.id
+    except HTTPException as he:
+        raise he
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
 
     # 2. If company role, create company record
@@ -27,7 +38,9 @@ async def register(body: RegisterRequest):
 @router.post("/login")
 async def login(body: LoginRequest):
     try:
-        res = supabase.auth.sign_in_with_password({"email": body.email, "password": body.password})
+        from database import get_supabase
+        auth_client = get_supabase()
+        res = auth_client.auth.sign_in_with_password({"email": body.email, "password": body.password})
         user = res.user
         session = res.session
     except Exception as e:

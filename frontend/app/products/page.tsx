@@ -1,6 +1,7 @@
 'use client'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Search, Building2, FileText, ArrowRight } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { CATEGORIES } from '@/types'
@@ -8,6 +9,7 @@ import type { Product } from '@/types'
 import { api } from '@/lib/api'
 import { Footer } from '@/components/layout/Footer'
 import { getCategoryColor } from '@/lib/utils'
+import { useAuthStore } from '@/stores/authStore'
 
 const stagger = {
   hidden: { opacity: 0 },
@@ -23,10 +25,13 @@ const fadeInUp = {
 function ProductCard({ product }: { product: Product }) {
   const categoryColor = getCategoryColor(product.category)
   const catLabel = CATEGORIES.find(c => c.value === product.category)?.label || product.category
+  const { isAuthenticated } = useAuthStore()
+
+  const targetUrl = isAuthenticated ? `/products/${product.id}` : `/login?redirect=/products/${product.id}`
 
   return (
     <motion.div variants={fadeInUp}>
-      <Link href={`/products/${product.id}`}>
+      <Link href={targetUrl}>
         <motion.div
           whileHover={{ y: -6, transition: { duration: 0.3 } }}
           className="card-hover overflow-hidden group cursor-pointer"
@@ -84,66 +89,76 @@ export default function ProductsPage() {
   const [category, setCategory] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [total, setTotal] = useState(0)
+  const { isAuthenticated } = useAuthStore()
+  const router = useRouter()
 
   useEffect(() => {
-    fetchProducts()
-  }, [search, category])
-
-  async function fetchProducts() {
-    setLoading(true)
-    try {
-      const params: Record<string, string> = {}
-      if (search) params.search = search
-      if (category) params.category = category
-      const res = await api.get('/products', { params })
-      setProducts(res.data.products || [])
-      setTotal(res.data.total || 0)
-    } catch {
-      // Demo fallback data
-      setProducts([
-        {
-          id: 'demo-1', company_id: 'c1', name: 'Honda Activa 6G', model_number: 'Activa 6G',
-          category: 'scooter', description: "Honda's best-selling automatic scooter, powered by a 109.51cc BS6 compliant engine.",
-          is_published: true, created_at: new Date().toISOString(),
-          companies: { name: 'Honda Motors' },
-          knowledge_documents: [{ id: 'd1', product_id: 'demo-1', title: 'Owner Manual', type: 'pdf', indexed: true, created_at: '' }],
-        },
-        {
-          id: 'demo-2', company_id: 'c2', name: 'Samsung WindFree AC', model_number: 'AR18BY4YATA',
-          category: 'ac', description: 'WindFree Cooling with 23,000 micro holes for gentle cool air without direct wind.',
-          is_published: true, created_at: new Date().toISOString(),
-          companies: { name: 'Samsung Electronics' },
-        },
-        {
-          id: 'demo-3', company_id: 'c3', name: 'LG TurboWash 360', model_number: 'FHP1208Z3M',
-          category: 'washing_machine', description: 'AI-powered washing machine with TurboWash 360 for a complete clean in under 30 minutes.',
-          is_published: true, created_at: new Date().toISOString(),
-          companies: { name: 'LG Electronics' },
-        },
-        {
-          id: 'demo-4', company_id: 'c4', name: 'Sony WH-1000XM5', model_number: 'WH-1000XM5',
-          category: 'electronics', description: 'Industry-leading noise cancelling headphones with next-gen processor and superior call quality.',
-          is_published: true, created_at: new Date().toISOString(),
-          companies: { name: 'Sony Corporation' },
-        },
-        {
-          id: 'demo-5', company_id: 'c5', name: 'Dyson V15 Detect', model_number: 'V15',
-          category: 'appliance', description: 'Laser-equipped cordless vacuum that reveals microscopic dust on hard floors.',
-          is_published: true, created_at: new Date().toISOString(),
-          companies: { name: 'Dyson Ltd' },
-        },
-        {
-          id: 'demo-6', company_id: 'c1', name: 'TVS Apache RTR 160', model_number: 'RTR 160 4V',
-          category: 'scooter', description: 'The ultimate sport bike with race-derived engineering and SmartXonnect technology.',
-          is_published: true, created_at: new Date().toISOString(),
-          companies: { name: 'TVS Motor Company' },
-        },
-      ])
-      setTotal(6)
-    } finally {
-      setLoading(false)
+    if (!isAuthenticated) {
+      router.push('/login?redirect=/products')
+      return
     }
-  }
+
+    async function fetchProducts() {
+      setLoading(true)
+      try {
+        const params: Record<string, string> = {}
+        if (search) params.search = search
+        if (category) params.category = category
+        const res = await api.get('/products', { params })
+        setProducts(res.data.products || [])
+        setTotal(res.data.total || 0)
+      } catch {
+        // Demo fallback data
+        setProducts([
+          {
+            id: 'demo-1', company_id: 'c1', name: 'Honda Activa 6G', model_number: 'Activa 6G',
+            category: 'scooter', description: "Honda's best-selling automatic scooter, powered by a 109.51cc BS6 compliant engine.",
+            is_published: true, created_at: new Date().toISOString(),
+            companies: { name: 'Honda Motors' },
+            knowledge_documents: [{ id: 'd1', product_id: 'demo-1', title: 'Owner Manual', type: 'pdf', indexed: true, created_at: '' }],
+          },
+          {
+            id: 'demo-2', company_id: 'c2', name: 'Samsung WindFree AC', model_number: 'AR18BY4YATA',
+            category: 'ac', description: 'WindFree Cooling with 23,000 micro holes for gentle cool air without direct wind.',
+            is_published: true, created_at: new Date().toISOString(),
+            companies: { name: 'Samsung Electronics' },
+          },
+          {
+            id: 'demo-3', company_id: 'c3', name: 'LG TurboWash 360', model_number: 'FHP1208Z3M',
+            category: 'washing_machine', description: 'AI-powered washing machine with TurboWash 360 for a complete clean in under 30 minutes.',
+            is_published: true, created_at: new Date().toISOString(),
+            companies: { name: 'LG Electronics' },
+          },
+          {
+            id: 'demo-4', company_id: 'c4', name: 'Sony WH-1000XM5', model_number: 'WH-1000XM5',
+            category: 'electronics', description: 'Industry-leading noise cancelling headphones with next-gen processor and superior call quality.',
+            is_published: true, created_at: new Date().toISOString(),
+            companies: { name: 'Sony Corporation' },
+          },
+          {
+            id: 'demo-5', company_id: 'c5', name: 'Dyson V15 Detect', model_number: 'V15',
+            category: 'appliance', description: 'Laser-equipped cordless vacuum that reveals microscopic dust on hard floors.',
+            is_published: true, created_at: new Date().toISOString(),
+            companies: { name: 'Dyson Ltd' },
+          },
+          {
+            id: 'demo-6', company_id: 'c1', name: 'TVS Apache RTR 160', model_number: 'RTR 160 4V',
+            category: 'scooter', description: 'The ultimate sport bike with race-derived engineering and SmartXonnect technology.',
+            is_published: true, created_at: new Date().toISOString(),
+            companies: { name: 'TVS Motor Company' },
+          },
+        ])
+        setTotal(6)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    const timer = setTimeout(() => {
+      fetchProducts()
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [search, category])
 
   const filteredProducts = products.filter(p => {
     if (category && p.category !== category) return false

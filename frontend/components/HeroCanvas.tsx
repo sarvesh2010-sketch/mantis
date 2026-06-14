@@ -132,13 +132,14 @@ export function HeroCanvas() {
     window.addEventListener('resize', handleResize)
 
     // Animation loop
-    let clock = new THREE.Clock()
+    const timer = new THREE.Timer()
     let animationId: number
 
-    const animate = () => {
+    const animate = (timestamp?: number) => {
       animationId = requestAnimationFrame(animate)
 
-      const elapsedTime = clock.getElapsedTime()
+      timer.update(timestamp)
+      const elapsedTime = timer.getElapsed()
 
       // Rotate objects
       icosahedron.rotation.x = elapsedTime * 0.1

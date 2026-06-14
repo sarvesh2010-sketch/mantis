@@ -36,6 +36,9 @@ export function Navbar() {
           <Link href="/products" className="btn-ghost text-sm">
             Products
           </Link>
+          <Link href="/companies" className="btn-ghost text-sm">
+            Companies
+          </Link>
           {isAuthenticated && user?.role === 'company' && (
             <Link href="/dashboard" className="btn-ghost text-sm">
               Dashboard
@@ -87,6 +90,9 @@ export function Navbar() {
           <div className="px-6 py-4 flex flex-col gap-2">
             <Link href="/products" className="btn-ghost text-sm text-left" onClick={() => setMobileOpen(false)}>
               Products
+            </Link>
+            <Link href="/companies" className="btn-ghost text-sm text-left" onClick={() => setMobileOpen(false)}>
+              Companies
             </Link>
             {isAuthenticated ? (
               <>

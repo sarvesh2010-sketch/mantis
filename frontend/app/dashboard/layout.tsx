@@ -1,9 +1,10 @@
 'use client'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Bug, LayoutDashboard, Package, Settings, LogOut } from 'lucide-react'
+import { LayoutDashboard, Package, Settings, LogOut } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
+import { useEffect } from 'react'
 
 const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Overview' },
@@ -13,7 +14,14 @@ const navItems = [
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const { company, user, clearAuth } = useAuthStore()
+  const router = useRouter()
+  const { company, user, isAuthenticated, clearAuth } = useAuthStore()
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.push('/login?redirect=/dashboard')
+    }
+  }, [isAuthenticated, router])
 
   return (
     <div className="min-h-screen flex pt-16">

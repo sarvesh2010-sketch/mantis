@@ -1,0 +1,3 @@
+# Pyrefly type checker configuration
+# Points to the project's virtual environment so Pyrefly can find installed packages
+python-interpreter-path = "venv/Scripts/python.exe"

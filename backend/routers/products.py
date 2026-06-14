@@ -73,3 +73,14 @@ async def get_company_products(company_id: str):
         "*, knowledge_documents(id, title, indexed)"
     ).eq("company_id", company_id).order("created_at", desc=True).execute()
     return result.data
+
+@router.get("/companies/all")
+async def list_companies_with_manuals():
+    try:
+        result = supabase.table("companies").select(
+            "id, name, logo_url, description, products(id, name, model_number, category, is_published, knowledge_documents(id, title, type, file_url, external_url))"
+        ).execute()
+        return result.data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+

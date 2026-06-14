@@ -1,6 +1,7 @@
 import os
 import tempfile
 import uuid
+import asyncio
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, BackgroundTasks
 from models.schemas import DocumentLinkCreate
 from database import supabase
@@ -29,6 +30,60 @@ async def _index_product(product_id: str):
             {"indexing_error": str(e)}
         ).eq("product_id", product_id).execute()
 
+async def _parse_and_index_document(product_id: str, doc_id: str, file_bytes: bytes):
+    """Background task: Parse PDF, save chunks, and rebuild MOSS index."""
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+        tmp.write(file_bytes)
+        tmp_path = tmp.name
+
+    try:
+        # Run CPU-intensive PDF parsing in a separate thread to avoid blocking the main event loop
+        page_count = await asyncio.to_thread(get_page_count, tmp_path)
+        chunks = await asyncio.to_thread(extract_chunks, tmp_path, doc_id, product_id)
+    except Exception as e:
+        supabase.table("knowledge_documents").update({
+            "indexing_error": f"PDF parsing error: {str(e)}",
+            "indexed": False
+        }).eq("id", doc_id).execute()
+        return
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
+
+    try:
+        # Update document record with page and chunk count
+        supabase.table("knowledge_documents").update({
+            "page_count": page_count,
+            "chunk_count": len(chunks)
+        }).eq("id", doc_id).execute()
+
+        # Save chunks to DB
+        chunk_rows = [{
+            "id": c["id"],
+            "document_id": doc_id,
+            "product_id": product_id,
+            "chunk_index": c["chunk_index"],
+            "content": c["content"],
+            "page_number": c["page_number"],
+            "section_tag": c["section_tag"],
+            "char_count": c["char_count"],
+        } for c in chunks]
+
+        # Insert chunks in batches of 100
+        for i in range(0, len(chunk_rows), 100):
+            supabase.table("document_chunks").insert(chunk_rows[i:i+100]).execute()
+
+        # Rebuild MOSS index
+        await _index_product(product_id)
+
+    except Exception as e:
+        supabase.table("knowledge_documents").update({
+            "indexing_error": f"Database indexing error: {str(e)}",
+            "indexed": False
+        }).eq("id", doc_id).execute()
+
 @router.post("/upload/{product_id}")
 async def upload_document(
     product_id: str,
@@ -47,53 +102,27 @@ async def upload_document(
     supabase.storage.from_("knowledge").upload(storage_path, file_bytes, {"content-type": "application/pdf"})
     file_url = supabase.storage.from_("knowledge").get_public_url(storage_path)
 
-    # Save temp file for parsing
-    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-        tmp.write(file_bytes)
-        tmp_path = tmp.name
-
-    try:
-        page_count = get_page_count(tmp_path)
-        chunks = extract_chunks(tmp_path, doc_id, product_id)
-    finally:
-        os.unlink(tmp_path)
-
-    # Save document record
+    # Save initial document record (status: indexing)
     supabase.table("knowledge_documents").insert({
         "id": doc_id,
         "product_id": product_id,
         "title": title,
         "type": "pdf",
         "file_url": file_url,
-        "page_count": page_count,
-        "chunk_count": len(chunks),
+        "page_count": 0,
+        "chunk_count": 0,
         "indexed": False,
     }).execute()
 
-    # Save chunks to DB
-    chunk_rows = [{
-        "id": c["id"],
-        "document_id": doc_id,
-        "product_id": product_id,
-        "chunk_index": c["chunk_index"],
-        "content": c["content"],
-        "page_number": c["page_number"],
-        "section_tag": c["section_tag"],
-        "char_count": c["char_count"],
-    } for c in chunks]
-
-    # Insert in batches of 100
-    for i in range(0, len(chunk_rows), 100):
-        supabase.table("document_chunks").insert(chunk_rows[i:i+100]).execute()
-
-    # Trigger background MOSS indexing
-    background_tasks.add_task(_index_product, product_id)
+    # Trigger background PDF parsing & MOSS indexing
+    background_tasks.add_task(_parse_and_index_document, product_id, doc_id, file_bytes)
 
     return {
         "document_id": doc_id,
         "title": title,
-        "page_count": page_count,
-        "chunk_count": len(chunks),
+        "page_count": 0,
+        "chunk_count": 0,
+        "file_url": file_url,
         "message": "Document uploaded and indexing started"
     }
 

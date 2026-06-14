@@ -1,7 +1,7 @@
 'use client'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
-import { Plus, Package, FileText, MoreHorizontal, Eye, EyeOff, Trash2, Edit, BookOpen } from 'lucide-react'
+import { Plus, Package, Eye, EyeOff, Trash2, Edit, BookOpen } from 'lucide-react'
 
 const demoProducts = [
   { id: '1', name: 'Honda Activa 6G', category: 'scooter', is_published: true, docs: 2 },

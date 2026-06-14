@@ -1,5 +1,6 @@
 import pdfplumber
 import re
+import uuid
 from typing import List, Dict
 
 CHUNK_SIZE = 600        # characters per chunk
@@ -41,7 +42,7 @@ def extract_chunks(pdf_path: str, document_id: str, product_id: str) -> List[Dic
                     break
 
                 chunks.append({
-                    "id": f"{document_id}_chunk_{chunk_index}",
+                    "id": str(uuid.uuid4()),
                     "document_id": document_id,
                     "product_id": product_id,
                     "chunk_index": chunk_index,

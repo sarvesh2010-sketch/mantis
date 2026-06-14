@@ -1,6 +1,6 @@
 import time
 from typing import List, Dict, Tuple
-from moss import MossClient, QueryOptions
+from moss import MossClient, QueryOptions, DocumentInfo
 from moss_client import get_moss
 
 async def create_product_index(product_id: str, chunks: List[Dict]) -> None:
@@ -9,17 +9,17 @@ async def create_product_index(product_id: str, chunks: List[Dict]) -> None:
     index_name = f"product-{product_id}"
 
     documents = [
-        {
-            "id": chunk["id"],
-            "text": chunk["content"],
-            "metadata": {
-                "document_id": chunk["document_id"],
-                "product_id": chunk["product_id"],
-                "page_number": chunk.get("page_number", 0),
-                "section_tag": chunk.get("section_tag", "general"),
-                "chunk_index": chunk["chunk_index"],
+        DocumentInfo(
+            id=chunk["id"],
+            text=chunk["content"],
+            metadata={
+                "document_id": str(chunk["document_id"]),
+                "product_id": str(chunk["product_id"]),
+                "page_number": str(chunk.get("page_number", 0)),
+                "section_tag": str(chunk.get("section_tag", "general")),
+                "chunk_index": str(chunk["chunk_index"]),
             }
-        }
+        )
         for chunk in chunks
     ]
 

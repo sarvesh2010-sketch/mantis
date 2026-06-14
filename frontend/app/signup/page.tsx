@@ -14,7 +14,7 @@ function SignupForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [companyName, setCompanyName] = useState('')
-  const [role, setRole] = useState<'company' | 'user'>(defaultRole as any)
+  const [role, setRole] = useState<'company' | 'user'>(defaultRole === 'company' ? 'company' : 'user')
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading] = useState(false)
   const { setAuth } = useAuthStore()
@@ -37,8 +37,9 @@ function SignupForm() {
       )
       toast.success('Account created!')
       router.push(role === 'company' ? '/dashboard' : '/products')
-    } catch (err: any) {
-      toast.error(err.response?.data?.detail || 'Registration failed')
+    } catch (err) {
+      const errorMsg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || 'Registration failed'
+      toast.error(errorMsg)
     } finally {
       setLoading(false)
     }
